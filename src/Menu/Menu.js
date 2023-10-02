@@ -15,7 +15,7 @@ function Menu() {
       <ul>
         <li><Link itemProp="/">Home</Link></li>
         <li><Link itemProp="/about">About</Link></li>
-        <li><Link itemProp="/login">Login</Link></li>
+        <li><Link itemProp="/login">d vd</Link></li>
       </ul>
     </nav>
   );
