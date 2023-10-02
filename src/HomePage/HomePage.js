@@ -2,7 +2,8 @@ import React, { useEffect } from "react";
 import axios from "axios";
 import { Chart as ChartJS } from "chart.js/auto";
 import * as d3 from "d3";
-
+import { pie, arc } from "d3-shape";
+import { scaleOrdinal } from "d3-scale";
 
 
 function HomePage() {
@@ -41,67 +42,189 @@ function HomePage() {
         dataSource.datasets[0].data[i] = res.data.myBudget[i].budget;
         dataSource.labels[i] = res.data.myBudget[i].title;
       }
-      drawChart(randomData(res.data.myBudget));
+      //drawChart(randomData(res.data.myBudget));
       createChart();
+      //createD3Chart();
     }).catch(function (error) {
       console.error("Error fetching budget data: ", error);
     });
   }  
   
 
-  var colors = [
-    "#ccff66", "#ff0066", "##00ff00", "#6600ff", "#003300", "#ff0000", "#ff8c00" 
-  ];
-
-  function drawChart(data) {
-    console.log("Data for D3 Chart:", data);
-    var svg = d3
-      .select("#d3Chart")
-      .append("svg")  
-      .attr("width", 700)
-      .attr("height", 600)
-      .append("g");
-    var width = 750,
-      height = 600,
-      radius = Math.min(width, height) / 2;
-    svg.attr("transform", "translate(" + width / 2 + "," + height / 2 + ")");
-
-    //createColors(data);
-
-    const arcGenerator = d3.arc().innerRadius(0).outerRadius(radius);
-    const pieGenerator = d3.pie().padAngle(0).value((d) => d.value);
-
-    const arc = svg.selectAll().data(pieGenerator(data)).enter();
-
-    // Append arcs
-    arc
-      .append("path")
-      .attr("d", arcGenerator)
-      .style("fill", (_, i) => colors[i])
-      .style("stroke", "#121926")
-      .style("stroke-width", "1px");
-
-    // Append text labels
-    arc
-      .append("text")
-      .text((d) => {
-        return d.data.label;
-      })
-      .attr("transform", (d) => "translate(" + arcGenerator.centroid(d) + ")")
-      .style("text-anchor", "middle")
-      .style("font-size", 15);
-  }
+  // var colors = [
+  //   "#ccff66", "#ff0066", "##00ff00", "#6600ff", "#003300", "#ff0000", "#ff8c00" 
+  // ];
 
   function randomData(budgetData) {
     return budgetData.map(function (data) {
       return { label: data.title, value: data.budget };
     });
   }
- 
+  
+  function createD3Chart() {
+
+      let arrTitle = [];
+      let arrBudget = [];
+
+      var svgElement = document.getElementById("d3Chart");
+      if (svgElement === null) {
+        // If svgElement is null, return early to prevent further execution.
+        return;
+      }
+
+      if(!svgElement.hasChildNodes()){
+          var svg = d3.select("#d3Chart")
+              .append("svg")
+              .append("g")
+
+          svg.append("g")
+              .attr("width", 100)
+              .attr("height", 100)
+              .attr("viewBox", "0 0 1000 1000")
+          svg.append("g")
+              .attr("class", "slices");
+          svg.append("g")
+              .attr("class", "labels");
+          svg.append("g")
+              .attr("class", "lines");
+
+          var width = 900,
+              height = 400,
+              radius = Math.min(width, height) / 2;
+
+              var pie = d3.pie()
+              .sort(null)
+              .value(function(d) {
+                return d.value;
+              });
+          
+            var arc = d3.arc()
+              .outerRadius(radius * 0.6)
+              .innerRadius(radius * 0.3);
+          
+            var outerArc = d3.arc()
+              .innerRadius(radius * 0.7)
+              .outerRadius(radius * 0.7);
+
+            svg.attr("transform", "translate(" + width / 2 + "," + height / 2 + ")");
+
+            var key = function(d){ return d.data.label; };
+
+            d3.json("http://localhost:3000/budget")
+            .then(function(data) {
+              var color = d3.scaleOrdinal()
+                .domain(data.map(function(d) { return d.title; }))
+                .range(["#98abc5", "#8a89a6", "#7b6888", "#6b486b", "#a05d56", "#d0743c", "#ff8c00"]);
+
+              function randomData() {
+                return pie(data).map(function(d) {
+                  return { label: d.data.title, value: d.data.budget };
+                });
+              }
+
+              change(randomData());
+
+              function change(data) {
+                  var slice = svg.select(".slices").selectAll("path.slice")
+                      .data(pie(data), key);
+
+                  slice.enter()
+                      .insert("path")
+                      .style("fill", function(d) { return color(d.data.label); })
+                      .attr("class", "slice");
+
+                  slice		
+                      .transition().duration(1000)
+                      .attrTween("d", function(d) {
+                          this._current = this._current || d;
+                          var interpolate = d3.interpolate(this._current, d);
+                          this._current = interpolate(0);
+                          return function(t) {
+                              return arc(interpolate(t));
+                          };
+                      })
+
+                  slice.exit()
+                      .remove();
+
+                  var text = svg.select(".labels").selectAll("text")
+                      .data(pie(data), key);
+
+                  text.enter()
+                      .append("text")
+                      .attr("dy", ".35em")
+                      .text(function(d) {
+                          return d.data.label;
+                      });
+                  
+                  function midAngle(d){
+                      return d.startAngle + (d.endAngle - d.startAngle)/2;
+                  }
+
+                  text.transition().duration(1000)
+                      .attrTween("transform", function(d) {
+                          this._current = this._current || d;
+                          var interpolate = d3.interpolate(this._current, d);
+                          this._current = interpolate(0);
+                          return function(t) {
+                              var d2 = interpolate(t);
+                              var pos = outerArc.centroid(d2);
+                              pos[0] = radius * (midAngle(d2) < Math.PI ? 1 : -1);
+                              return "translate("+ pos +")";
+                          };
+                      })
+                      .styleTween("text-anchor", function(d){
+                          this._current = this._current || d;
+                          var interpolate = d3.interpolate(this._current, d);
+                          this._current = interpolate(0);
+                          return function(t) {
+                              var d2 = interpolate(t);
+                              return midAngle(d2) < Math.PI ? "start":"end";
+                          };
+                      });
+
+                      text.exit()
+                          .remove();
+
+                      var polyline = svg.select(".lines").selectAll("polyline")
+                          .data(pie(data), key);
+
+                      polyline.enter()
+                          .append("polyline");
+
+                      polyline.transition().duration(1000)
+                          .attrTween("points", function(d){
+                              this._current = this._current || d;
+                              var interpolate = d3.interpolate(this._current, d);
+                              this._current = interpolate(0);
+                              return function(t) {
+                                  var d2 = interpolate(t);
+                                  var pos = outerArc.centroid(d2);
+                                  pos[0] = radius * 0.95 * (midAngle(d2) < Math.PI ? 1 : -1);
+                                  return [arc.centroid(d2), outerArc.centroid(d2), pos];
+                              };			
+                          });
+
+                      polyline.exit()
+                          .remove();
+                }
+          });
+      }
+  }
 
   useEffect(() => {
     console.log("useEffect is running!");
     getBudget();
+    createD3Chart();
+    
+
+    // // Ensure the DOM is fully loaded before executing D3 code
+    // document.addEventListener("DOMContentLoaded", createD3Chart);
+
+    // Cleanup event listener when the component is unmounted
+    return () => {
+      document.removeEventListener("DOMContentLoaded", createD3Chart);
+    };
   }, []);
   
   return (
