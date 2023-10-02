@@ -1,22 +1,21 @@
 import React from 'react';
-
-import {
-    Link
-  } from "react-router-dom";
+import { Link } from 'react-router-dom';
 
 function Menu() {
   return (
     <nav
-        role = "navigation"
-        aria-label="Main menu"
+        role='navigation'
+        aria-label='Main menu'
         itemScope
-        itemType="https://schema.org/SiteNavigationElement"
+        itemType='https://schema.org/SiteNavigationElement'
     >
-      <ul>
-        <li><Link itemProp="/">Home</Link></li>
-        <li><Link itemProp="/about">About</Link></li>
-        <li><Link itemProp="/login">Login</Link></li>
-      </ul>
+        <div className="menu">
+            <ul>
+                <li><Link itemProp='url' to={'/'}>Homepage</Link></li>
+                <li><Link to={'/about'}>About</Link></li>
+                <li><Link to={'/login'}>Login</Link></li>
+            </ul>
+        </div>
     </nav>
   );
 }
